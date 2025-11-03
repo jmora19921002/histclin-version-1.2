@@ -89,6 +89,130 @@ class Enfermera:
             return result[0]
         return None
 
+    # Modelos para odontología
+    class Odontologo:
+        def __init__(self, id=None, nombre="", apellido="", especialidad="", telefono="", email=""):
+            self.id = id
+            self.nombre = nombre
+            self.apellido = apellido
+            self.especialidad = especialidad
+            self.telefono = telefono
+            self.email = email
+
+        def guardar(self):
+            query = """
+            INSERT INTO odontologos (nombre, apellido, especialidad, telefono, email)
+            VALUES (%s, %s, %s, %s, %s)
+            """
+            params = (self.nombre, self.apellido, self.especialidad, self.telefono, self.email)
+            return db_manager.execute_query(query, params)
+
+        def actualizar(self):
+            query = """
+            UPDATE odontologos SET nombre=%s, apellido=%s, especialidad=%s, telefono=%s, email=%s
+            WHERE id=%s
+            """
+            params = (self.nombre, self.apellido, self.especialidad, self.telefono, self.email, self.id)
+            return db_manager.execute_query(query, params)
+
+        def eliminar(self):
+            query = "DELETE FROM odontologos WHERE id=%s"
+            return db_manager.execute_query(query, (self.id,))
+
+        @staticmethod
+        def obtener_todos():
+            query = "SELECT * FROM odontologos ORDER BY apellido, nombre"
+            return db_manager.execute_query(query)
+
+        @staticmethod
+        def obtener_por_id(id):
+            query = "SELECT * FROM odontologos WHERE id=%s"
+            result = db_manager.execute_query(query, (id,))
+            if result:
+                return result[0]
+            return None
+
+    class TratamientoDental:
+        def __init__(self, id=None, paciente_id=None, odontologo_id=None, descripcion="", fecha=None, pieza_dental="", estado=""):
+            self.id = id
+            self.paciente_id = paciente_id
+            self.odontologo_id = odontologo_id
+            self.descripcion = descripcion
+            self.fecha = fecha or date.today()
+            self.pieza_dental = pieza_dental
+            self.estado = estado
+
+        def guardar(self):
+            query = """
+            INSERT INTO tratamientos_dentales (paciente_id, odontologo_id, descripcion, fecha, pieza_dental, estado)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            params = (self.paciente_id, self.odontologo_id, self.descripcion, self.fecha, self.pieza_dental, self.estado)
+            return db_manager.execute_query(query, params)
+
+        def actualizar(self):
+            query = """
+            UPDATE tratamientos_dentales SET paciente_id=%s, odontologo_id=%s, descripcion=%s, fecha=%s, pieza_dental=%s, estado=%s
+            WHERE id=%s
+            """
+            params = (self.paciente_id, self.odontologo_id, self.descripcion, self.fecha, self.pieza_dental, self.estado, self.id)
+            return db_manager.execute_query(query, params)
+
+        def eliminar(self):
+            query = "DELETE FROM tratamientos_dentales WHERE id=%s"
+            return db_manager.execute_query(query, (self.id,))
+
+        @staticmethod
+        def obtener_todos():
+            query = "SELECT * FROM tratamientos_dentales ORDER BY fecha DESC"
+            return db_manager.execute_query(query)
+
+        @staticmethod
+        def obtener_por_id(id):
+            query = "SELECT * FROM tratamientos_dentales WHERE id=%s"
+            result = db_manager.execute_query(query, (id,))
+            if result:
+                return result[0]
+            return None
+
+    class Odontograma:
+        def __init__(self, id=None, paciente_id=None, fecha=None, piezas=None):
+            self.id = id
+            self.paciente_id = paciente_id
+            self.fecha = fecha or date.today()
+            self.piezas = piezas or ""  # Puede ser un JSON o string con el estado de las piezas dentales
+
+        def guardar(self):
+            query = """
+            INSERT INTO odontogramas (paciente_id, fecha, piezas)
+            VALUES (%s, %s, %s)
+            """
+            params = (self.paciente_id, self.fecha, self.piezas)
+            return db_manager.execute_query(query, params)
+
+        def actualizar(self):
+            query = """
+            UPDATE odontogramas SET paciente_id=%s, fecha=%s, piezas=%s WHERE id=%s
+            """
+            params = (self.paciente_id, self.fecha, self.piezas, self.id)
+            return db_manager.execute_query(query, params)
+
+        def eliminar(self):
+            query = "DELETE FROM odontogramas WHERE id=%s"
+            return db_manager.execute_query(query, (self.id,))
+
+        @staticmethod
+        def obtener_todos():
+            query = "SELECT * FROM odontogramas ORDER BY fecha DESC"
+            return db_manager.execute_query(query)
+
+        @staticmethod
+        def obtener_por_id(id):
+            query = "SELECT * FROM odontogramas WHERE id=%s"
+            result = db_manager.execute_query(query, (id,))
+            if result:
+                return result[0]
+            return None
 class Paciente:
     def __init__(self, id=None, nombre="", apellido="", fecha_nacimiento=None, edad=None, 
                  genero="", telefono="", email="", direccion="", grupo_sanguineo="", 

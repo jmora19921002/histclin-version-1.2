@@ -283,6 +283,7 @@
                             </ul>
                         </div>
                         <!-- Opción Seguridad -->
+                        {% if current_user.rol == 'administrador' %}
                         <li class="nav-item">
                             <a class="nav-link" href="#" id="seguridadLink">
                                 <i class="fas fa-shield-alt me-2"></i> Seguridad
@@ -307,12 +308,13 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link text-white-50" href="{{ url_for('configuracion') }}">
-                                        <i class="fas fa-cogs me-2"></i> Configuración
+                                    <a class="nav-link text-white-50" href="{{ url_for('accesos_directos') }}">
+                                        <i class="fas fa-star me-2"></i> Accesos Directos
                                     </a>
                                 </li>
                             </ul>
                         </div>
+                        {% endif %}
                     </ul>
                 </div>
                 <!-- Footer Configuración (siempre abajo) -->

@@ -1,147 +1,160 @@
-{% extends 'base.html' %}
-{% block title %}Nueva Emergencia{% endblock %}
+{% extends "base.html" %}
+
+{% block title %}Nueva Emergencia - Medisoft{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4">Registrar Nueva Emergencia</h2>
-    <form method="POST">
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label for="paciente_id" class="form-label">Paciente</label>
-                <select class="form-select" name="paciente_id" id="paciente_id" required>
-                    {% for paciente in pacientes %}
-                        <option value="{{ paciente.id }}">{{ paciente.nombre }} {{ paciente.apellido }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="medico_id" class="form-label">Médico</label>
-                <select class="form-select" name="medico_id" id="medico_id" required>
-                    {% for medico in medicos %}
-                        <option value="{{ medico.id }}">{{ medico.nombre }} {{ medico.apellido }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Motivos de Emergencia</label>
-            <select class="form-select" name="motivos[]" multiple required>
-                {% for motivo in motivos_precargados %}
-                    <option value="{{ motivo }}">{{ motivo }}</option>
-                {% endfor %}
-            </select>
-            <small class="text-muted">Puedes seleccionar uno o varios motivos.</small>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Medicamentos Aplicados</label>
-            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#medicamentosModal">Seleccionar Medicamentos</button>
-            <input type="hidden" name="medicamentos_aplicados" id="medicamentos_aplicados">
-            <div id="medicamentosSeleccionados" class="mt-2"></div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Instrumentos/Insumos Utilizados</label>
-            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#insumosModal">Seleccionar Insumos</button>
-            <input type="hidden" name="instrumentos_aplicados" id="instrumentos_aplicados">
-            <div id="insumosSeleccionados" class="mt-2"></div>
-        </div>
-        <div class="mb-3">
-            <label for="tiempo_observacion" class="form-label">Tiempo de Observación</label>
-            <input type="text" class="form-control" name="tiempo_observacion" id="tiempo_observacion">
-        </div>
-        <div class="mb-3">
-            <label for="observaciones" class="form-label">Observaciones</label>
-            <textarea class="form-control" name="observaciones" id="observaciones" rows="3"></textarea>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Enfermeras que atendieron</label>
-            <select class="form-select" name="enfermeras[]" multiple required>
-                {% for enfermera in enfermeras_list %}
-                    <option value="{{ enfermera.id }}">{{ enfermera.nombre }} {{ enfermera.apellido }}</option>
-                {% endfor %}
-            </select>
-            <small class="text-muted">Puedes seleccionar una o varias enfermeras.</small>
-        </div>
-        <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="hospitalizar" id="hospitalizar">
-            <label class="form-check-label" for="hospitalizar">¿Paciente amerita hospitalización?</label>
-        </div>
-        <button type="submit" class="btn btn-success">Registrar Emergencia</button>
-    </form>
-</div>
-
-<!-- Modal Medicamentos -->
-<div class="modal fade" id="medicamentosModal" tabindex="-1" aria-labelledby="medicamentosModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="medicamentosModalLabel">Seleccionar Medicamentos</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <div class="list-group">
-          {% for medicamento in medicamentos_list %}
-            <label class="list-group-item">
-              <input class="form-check-input me-1" type="checkbox" value="{{ medicamento.nombre }}" name="medicamento_check">
-              {{ medicamento.nombre }}
-            </label>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" id="guardarMedicamentos" data-bs-dismiss="modal">Guardar selección</button>
-      </div>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-ambulance text-danger me-2"></i>Nueva Emergencia</h2>
+    <a href="{{ url_for('buscar_emergencias') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Volver
+        </a>
     </div>
-  </div>
-</div>
 
-<!-- Modal Insumos -->
-<div class="modal fade" id="insumosModal" tabindex="-1" aria-labelledby="insumosModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="insumosModalLabel">Seleccionar Insumos</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <div class="list-group">
-          {% for insumo in insumos_list %}
-            <label class="list-group-item">
-              <input class="form-check-input me-1" type="checkbox" value="{{ insumo.nombre }}" name="insumo_check">
-              {{ insumo.nombre }}
-            </label>
-          {% endfor %}
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Registro de Emergencia</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('nueva_emergencia') }}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="paciente_id" class="form-label">Paciente *</label>
+                                <select class="form-select" id="paciente_id" name="paciente_id" required>
+                                    <option value="">Seleccionar paciente</option>
+                                    {% for paciente in pacientes %}
+                                    <option value="{{ paciente.id }}">
+                                        {{ paciente.apellido }}, {{ paciente.nombre }} - DNI: {{ paciente.dni }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="medico_id" class="form-label">Médico Atendiente *</label>
+                                <select class="form-select" id="medico_id" name="medico_id" required>
+                                    <option value="">Seleccionar médico</option>
+                                    {% for medico in medicos %}
+                                    <option value="{{ medico.id }}">
+                                        Dr. {{ medico.apellido }} - {{ medico.especialidad }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="motivo" class="form-label">Motivo de Emergencia *</label>
+                            <textarea class="form-control" id="motivo" name="motivo" rows="3" 
+                                      placeholder="Describa el motivo de la emergencia..." required></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="medicamentos_aplicados" class="form-label">Medicamentos Aplicados</label>
+                                <textarea class="form-control" id="medicamentos_aplicados" name="medicamentos_aplicados" 
+                                          rows="3" placeholder="Liste los medicamentos aplicados..."></textarea>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="instrumentos_aplicados" class="form-label">Instrumentos Utilizados</label>
+                                <textarea class="form-control" id="instrumentos_aplicados" name="instrumentos_aplicados" 
+                                          rows="3" placeholder="Liste los instrumentos utilizados..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="tiempo_observacion" class="form-label">Tiempo de Observación</label>
+                                <input type="text" class="form-control" id="tiempo_observacion" name="tiempo_observacion" 
+                                       placeholder="Ej: 2 horas, 30 minutos">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="tratamiento_aplicado" name="tratamiento_aplicado">
+                                    <label class="form-check-label" for="tratamiento_aplicado">
+                                        Tratamiento Aplicado
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="observaciones" class="form-label">Observaciones Adicionales</label>
+                            <textarea class="form-control" id="observaciones" name="observaciones" 
+                                      rows="4" placeholder="Observaciones importantes, estado del paciente, etc..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fas fa-save me-2"></i>Registrar Emergencia
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" id="guardarInsumos" data-bs-dismiss="modal">Guardar selección</button>
-      </div>
-    </div>
-  </div>
-</div>
 
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Información Importante</h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Emergencia:</strong> Registre inmediatamente toda la información disponible.
+                    </div>
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Complete todos los campos obligatorios
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Describa detalladamente el motivo
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Registre medicamentos e instrumentos
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check text-success me-2"></i>
+                            Incluya observaciones relevantes
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
-// Guardar selección de medicamentos
-const guardarMedicamentosBtn = document.getElementById('guardarMedicamentos');
-if (guardarMedicamentosBtn) {
-    guardarMedicamentosBtn.onclick = function() {
-        let seleccionados = [];
-        document.querySelectorAll('input[name="medicamento_check"]:checked').forEach(function(el) {
-            seleccionados.push(el.value);
+document.addEventListener('DOMContentLoaded', function() {
+    // Validación del formulario
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const paciente = document.getElementById('paciente_id').value;
+        const medico = document.getElementById('medico_id').value;
+        const motivo = document.getElementById('motivo').value.trim();
+        
+        if (!paciente || !medico || !motivo) {
+            e.preventDefault();
+            alert('Por favor complete todos los campos obligatorios.');
+            return false;
+        }
+    });
+
+    // Auto-resize de textareas
+    const textareas = document.querySelectorAll('textarea');
+    textareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
         });
-        document.getElementById('medicamentos_aplicados').value = seleccionados.join(', ');
-        document.getElementById('medicamentosSeleccionados').innerText = seleccionados.join(', ');
-    };
-}
-// Guardar selección de insumos
-const guardarInsumosBtn = document.getElementById('guardarInsumos');
-if (guardarInsumosBtn) {
-    guardarInsumosBtn.onclick = function() {
-        let seleccionados = [];
-        document.querySelectorAll('input[name="insumo_check"]:checked').forEach(function(el) {
-            seleccionados.push(el.value);
-        });
-        document.getElementById('instrumentos_aplicados').value = seleccionados.join(', ');
-        document.getElementById('insumosSeleccionados').innerText = seleccionados.join(', ');
-    };
-}
+    });
+});
 </script>
 {% endblock %}

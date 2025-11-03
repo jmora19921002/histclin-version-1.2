@@ -1,5 +1,3 @@
-# ...existing code...
-
 
 from flask import jsonify
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort, send_file
@@ -247,83 +245,6 @@ def validar_correo():
 @app.route('/orden_laboratorio', methods=['POST'])
 @login_required
 def orden_laboratorio():
-    None
-
-@app.route('/emergencias/nuevo', methods=['GET', 'POST'])
-@login_required
-def nueva_emergencia():
-    motivos_precargados = [
-        "Accidente de tránsito",
-        "Caída",
-        "Dolor torácico",
-        "Dificultad respiratoria",
-        "Convulsiones",
-        "Trauma",
-        "Hemorragia",
-        "Fiebre alta",
-        "Otros"
-    ]
-    medicamentos_list = Medicamento.query.all()
-    insumos_list = Insumo.query.all()
-    pacientes_list = Paciente.query.all()
-    medicos_list = Medico.query.all()
-    enfermeras_list = Enfermera.query.all()
-
-    if request.method == 'POST':
-        paciente_id = int(request.form['paciente_id'])
-        medico_id = int(request.form['medico_id'])
-        motivos = request.form.getlist('motivos[]')
-        motivo = ', '.join(motivos)
-        medicamentos_aplicados = request.form.get('medicamentos_aplicados', '')
-        instrumentos_aplicados = request.form.get('instrumentos_aplicados', '')
-        tiempo_observacion = request.form.get('tiempo_observacion', '')
-        tratamiento_aplicado = request.form.get('tratamiento_aplicado') == 'on'
-        observaciones = request.form.get('observaciones', '')
-        enfermeras_ids = request.form.getlist('enfermeras[]')
-        hospitalizar = request.form.get('hospitalizar') == 'on'
-        emergencia = Emergencia(
-            paciente_id=paciente_id,
-            medico_id=medico_id,
-            motivo=motivo,
-            medicamentos_aplicados=medicamentos_aplicados,
-            instrumentos_aplicados=instrumentos_aplicados,
-            tiempo_observacion=tiempo_observacion,
-            tratamiento_aplicado=tratamiento_aplicado,
-            observaciones=observaciones
-        )
-        db.session.add(emergencia)
-        db.session.commit()
-
-        # Relacionar enfermeras que atendieron (puedes crear una tabla EmergenciaEnfermera si quieres guardar varias)
-        # Ejemplo: emergencia_enfermera = EmergenciaEnfermera(emergencia_id=emergencia.id, enfermera_id=enf_id)
-        # for enf_id in enfermeras_ids: ...
-
-        # Si amerita hospitalización, registrar hospitalización y pasar datos
-        if hospitalizar:
-            hospitalizacion = Hospitalizacion(
-                paciente_id=paciente_id,
-                medico_id=medico_id,
-                enfermera_id=int(enfermeras_ids[0]) if enfermeras_ids else None,
-                fecha_ingreso=datetime.utcnow(),
-                dias_hospitalizado=1,
-                observaciones=f'Hospitalización por emergencia #{emergencia.id}'
-            )
-            db.session.add(hospitalizacion)
-            db.session.commit()
-            flash('Emergencia y hospitalización registrada exitosamente')
-            return redirect(url_for('hospitalizaciones'))
-        flash('Emergencia registrada exitosamente')
-        return redirect(url_for('buscar_emergencias'))
-
-    return render_template(
-        'emergencias/nuevo.html',
-        motivos_precargados=motivos_precargados,
-        medicamentos_list=medicamentos_list,
-        insumos_list=insumos_list,
-        pacientes=pacientes_list,
-        medicos=medicos_list,
-        enfermeras_list=enfermeras_list
-    )
     try:
         data = request.get_json()
         consulta_id = data.get('consulta_id')
@@ -1134,32 +1055,7 @@ def nuevo_usuario():
         return redirect(url_for('usuarios'))
     return render_template('usuarios_nuevo.html')
 
-@app.route('/usuarios/<int:id>/editar', methods=['GET', 'POST'])
-@login_required
-@role_required('administrador')
-def editar_usuario(id):
-    usuario = Usuario.query.get_or_404(id)
-    if request.method == 'POST':
-        usuario.email = request.form['email']
-        usuario.rol = request.form['rol']
-        if request.form.get('password'):
-            usuario.password_hash = generate_password_hash(request.form['password'])
-        db.session.commit()
-        flash('Usuario actualizado correctamente.', 'success')
-        return redirect(url_for('usuarios'))
-    return render_template('usuarios_editar.html', usuario=usuario)
-@app.route('/usuarios/<int:id>/eliminar', methods=['POST'])
-@login_required
-@role_required('administrador')
-def eliminar_usuario(id):
-    usuario = Usuario.query.get_or_404(id)
-    if usuario.username == 'admin':
-        flash('No se puede eliminar el usuario administrador.', 'danger')
-        return redirect(url_for('usuarios'))
-    db.session.delete(usuario)
-    db.session.commit()
-    flash('Usuario eliminado correctamente.', 'success')
-    return redirect(url_for('usuarios'))
+ 
 
 # (Las rutas de editar/eliminar usuario se moverán después de la inicialización de Flask y los decoradores)
  
@@ -1262,38 +1158,9 @@ def pacientes():
     return render_template('pacientes/index.html', pacientes=pacientes_list)
     
 # Ruta para permisos
-@app.route('/permisos', methods=['GET', 'POST'])
-@login_required
-@role_required('administrador')
+@app.route('/permisos')
 def permisos():
-    usuarios = Usuario.query.all()
-    permisos = Permiso.query.all()
-    if request.method == 'POST':
-        for usuario in usuarios:
-            for permiso in permisos:
-                key = f"permiso_{usuario.id}_{permiso.id}"
-                puede_crear = request.form.get(f"crear_{key}") == 'on'
-                puede_leer = request.form.get(f"leer_{key}") == 'on'
-                puede_actualizar = request.form.get(f"actualizar_{key}") == 'on'
-                puede_eliminar = request.form.get(f"eliminar_{key}") == 'on'
-                pu = PermisoUsuario.query.filter_by(usuario_id=usuario.id, permiso_id=permiso.id).first()
-                if not pu:
-                    pu = PermisoUsuario(usuario_id=usuario.id, permiso_id=permiso.id)
-                    db.session.add(pu)
-                pu.puede_crear = puede_crear
-                pu.puede_leer = puede_leer
-                pu.puede_actualizar = puede_actualizar
-                pu.puede_eliminar = puede_eliminar
-        db.session.commit()
-        flash('Permisos actualizados correctamente.', 'success')
-        return redirect(url_for('permisos'))
-    permisos_usuario = {}
-    for usuario in usuarios:
-        permisos_usuario[usuario.id] = {}
-        for permiso in permisos:
-            pu = PermisoUsuario.query.filter_by(usuario_id=usuario.id, permiso_id=permiso.id).first()
-            permisos_usuario[usuario.id][permiso.id] = pu
-    return render_template('permisos.html', usuarios=usuarios, permisos=permisos, permisos_usuario=permisos_usuario)
+    return render_template('permisos.html')
     
 # Ruta para auditoria
 @app.route('/auditoria')
@@ -1690,6 +1557,26 @@ def eliminar_hospitalizacion(id):
 
 
 @app.route('/emergencias/nuevo', methods=['GET', 'POST'])
+@login_required
+def nueva_emergencia():
+    if request.method == 'POST':
+        emergencia = Emergencia(
+            paciente_id=int(request.form['paciente_id']),
+            medico_id=int(request.form['medico_id']),
+            motivo=request.form['motivo'],
+            medicamentos_aplicados=request.form.get('medicamentos_aplicados', ''),
+            instrumentos_aplicados=request.form.get('instrumentos_aplicados', ''),
+            tiempo_observacion=request.form.get('tiempo_observacion', ''),
+            tratamiento_aplicado=request.form.get('tratamiento_aplicado') == 'on',
+            observaciones=request.form.get('observaciones', '')
+        )
+        db.session.add(emergencia)
+        db.session.commit()
+        flash('Emergencia registrada exitosamente')
+        return redirect(url_for('buscar_emergencias'))
+    pacientes_list = Paciente.query.all()
+    medicos_list = Medico.query.all()
+    return render_template('emergencias/nuevo.html', pacientes=pacientes_list, medicos=medicos_list)
 
 @app.route('/emergencias/<int:id>')
 @login_required
@@ -1734,7 +1621,6 @@ def eliminar_emergencia(id):
 def buscar_emergencias():
     paciente_id = request.args.get('paciente_id', type=int)
     medico_id = request.args.get('medico_id', type=int)
-
     fecha_desde = request.args.get('fecha_desde')
     fecha_hasta = request.args.get('fecha_hasta')
     
@@ -2147,6 +2033,15 @@ def editar_bioanalista(id):
         flash('Bioanalista actualizado exitosamente')
         return redirect(url_for('bioanalistas'))
     return render_template('bioanalistas_editar.html', bioanalista=bioanalista)
+
+@app.route('/bioanalistas/<int:id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_bioanalista(id):
+    bioanalista = Bioanalista.query.get_or_404(id)
+    db.session.delete(bioanalista)
+    db.session.commit()
+    flash('Bioanalista eliminado exitosamente')
+    return redirect(url_for('bioanalistas'))
 
 
 # Función para obtener accesos directos del usuario
