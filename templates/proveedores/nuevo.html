@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Proveedor{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-truck"></i> Registrar Nuevo Proveedor</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('nuevo_proveedor') }}">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="rif">RIF <span class="text-danger">*</span></label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="rif" 
+                                           name="rif" 
+                                           placeholder="J-12345678-9" 
+                                           required>
+                                    <small class="form-text text-muted">Formato: J-12345678-9</small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="tipo">Tipo de Proveedor <span class="text-danger">*</span></label>
+                                    <select class="form-control" id="tipo" name="tipo" required>
+                                        <option value="">Seleccione...</option>
+                                        <option value="medicamentos">Medicamentos</option>
+                                        <option value="insumos">Insumos Médicos</option>
+                                        <option value="equipos">Equipos</option>
+                                        <option value="laboratorio">Laboratorio</option>
+                                        <option value="limpieza">Limpieza</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="razon_social">Razón Social <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="razon_social" 
+                                   name="razon_social" 
+                                   placeholder="Nombre de la empresa" 
+                                   required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="contacto">Persona de Contacto</label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="contacto" 
+                                           name="contacto" 
+                                           placeholder="Nombre del contacto">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="telefono">Teléfono <span class="text-danger">*</span></label>
+                                    <input type="tel" 
+                                           class="form-control" 
+                                           id="telefono" 
+                                           name="telefono" 
+                                           placeholder="0212-1234567" 
+                                           required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">Email <span class="text-danger">*</span></label>
+                            <input type="email" 
+                                   class="form-control" 
+                                   id="email" 
+                                   name="email" 
+                                   placeholder="contacto@proveedor.com" 
+                                   required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="direccion">Dirección</label>
+                            <textarea class="form-control" 
+                                      id="direccion" 
+                                      name="direccion" 
+                                      rows="3" 
+                                      placeholder="Dirección completa del proveedor"></textarea>
+                        </div>
+
+                        <hr>
+                        
+                        <div class="form-group text-right">
+                            <a href="{{ url_for('proveedores') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Guardar Proveedor
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Validación adicional del formulario
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    
+    form.addEventListener('submit', function(e) {
+        const rif = document.getElementById('rif').value;
+        const rifPattern = /^[JVEGPjvegp]-\d{8}-\d$/;
+        
+        if (!rifPattern.test(rif)) {
+            e.preventDefault();
+            alert('El formato del RIF no es válido. Use: J-12345678-9');
+            document.getElementById('rif').focus();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -161,14 +161,15 @@
                                         <i class="fas fa-user-nurse me-2"></i> Enfermeras
                                     </a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link text-white-50" href="{{ url_for('honorarios') }}">
-                                        <i class="fas fa-dollar-sign me-2"></i> Honorarios
-                                    </a>
-                                </li>
+                                <!-- Honorarios deshabilitados -->
                                 <li class="nav-item">
                                     <a class="nav-link text-white-50" href="{{ url_for('bioanalistas') }}">
                                         <i class="fas fa-vial me-2"></i> Bioanalistas
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('proveedores') }}">
+                                        <i class="fas fa-truck me-2"></i> Proveedores
                                     </a>
                                 </li>
                             </ul>
@@ -205,6 +206,95 @@
                                 <li class="nav-item">
                                     <a class="nav-link text-white-50" href="{{ url_for('cirugias') }}">
                                         <i class="fas fa-user-md me-2"></i> Cirugías
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('historia_unica', paciente_id=1) }}" onclick="return seleccionarPaciente()">
+                                        <i class="fas fa-file-medical me-2"></i> Historia Única
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <!-- Opción AGENDA Y CITAS -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" id="agendaLink">
+                                <i class="fas fa-calendar-alt me-2"></i> Agenda y Citas
+                                <i class="fas fa-chevron-down ms-auto float-end"></i>
+                            </a>
+                        </li>
+                        <div class="ms-3" id="agendaSubmenu" style="display: none;">
+                            <ul class="nav flex-column">
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('agenda_calendario') }}">
+                                        <i class="fas fa-calendar me-2"></i> Calendario
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('agenda_citas') }}">
+                                        <i class="fas fa-clock me-2"></i> Citas
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('nueva_cita') }}">
+                                        <i class="fas fa-plus me-2"></i> Nueva Cita
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <!-- Opción PRESCRIPCIÓN -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" id="prescripcionLink">
+                                <i class="fas fa-prescription me-2"></i> Prescripción
+                                <i class="fas fa-chevron-down ms-auto float-end"></i>
+                            </a>
+                        </li>
+                        <div class="ms-3" id="prescripcionSubmenu" style="display: none;">
+                            <ul class="nav flex-column">
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('prescripciones') }}">
+                                        <i class="fas fa-list me-2"></i> Ver Prescripciones
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('nueva_prescripcion') }}">
+                                        <i class="fas fa-plus me-2"></i> Nueva Prescripción
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('plantillas_prescripcion') }}">
+                                        <i class="fas fa-file-alt me-2"></i> Plantillas
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <!-- Opción RECEPCIÓN -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('recepcion') }}">
+                                <i class="fas fa-clinic-medical me-2"></i> Recepción
+                            </a>
+                        </li>
+                        <!-- Opción COMUNICACIÓN -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" id="comunicacionLink">
+                                <i class="fas fa-envelope me-2"></i> Comunicación
+                                <i class="fas fa-chevron-down ms-auto float-end"></i>
+                            </a>
+                        </li>
+                        <div class="ms-3" id="comunicacionSubmenu" style="display: none;">
+                            <ul class="nav flex-column">
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('comunicacion_mensajes') }}">
+                                        <i class="fas fa-comment me-2"></i> Mensajes
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('comunicacion_alertas') }}">
+                                        <i class="fas fa-exclamation-triangle me-2"></i> Alertas
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('comunicacion_comunicados') }}">
+                                        <i class="fas fa-bullhorn me-2"></i> Comunicados
                                     </a>
                                 </li>
                             </ul>
@@ -259,6 +349,21 @@
                                         <i class="fas fa-flask me-2"></i> Contabilidad
                                     </a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('informes_epidemiologia') }}">
+                                        <i class="fas fa-chart-line me-2"></i> Epidemiología
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('informes_calidad') }}">
+                                        <i class="fas fa-star me-2"></i> Calidad Asistencial
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('informes_bi') }}">
+                                        <i class="fas fa-chart-bar me-2"></i> Business Intelligence
+                                    </a>
+                                </li>
                             </ul>
                         </div>
                         <!-- Opción Evaluaciones -->
@@ -278,6 +383,42 @@
                                 <li class="nav-item">
                                     <a class="nav-link text-white-50" href="{{ url_for('evaluaciones_imagenologia') }}">
                                         <i class="fas fa-x-ray me-2"></i> Imagenología
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        <!-- Opción HOSPITALIZACIÓN AMPLIADA -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" id="hospitalizacionLink">
+                                <i class="fas fa-hospital-alt me-2"></i> Hospitalización
+                                <i class="fas fa-chevron-down ms-auto float-end"></i>
+                            </a>
+                        </li>
+                        <div class="ms-3" id="hospitalizacionSubmenu" style="display: none;">
+                            <ul class="nav flex-column">
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('hospitalizaciones') }}">
+                                        <i class="fas fa-procedures me-2"></i> Gestión General
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('hospitalizaciones_camas') }}">
+                                        <i class="fas fa-bed me-2"></i> Camas
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('hospitalizaciones_rondas') }}">
+                                        <i class="fas fa-user-nurse me-2"></i> Rondas Médicas
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('hospitalizaciones_signos') }}">
+                                        <i class="fas fa-heartbeat me-2"></i> Signos Vitales
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-white-50" href="{{ url_for('hospitalizaciones_prealtas') }}">
+                                        <i class="fas fa-file-medical-alt me-2"></i> Pre-Altas
                                     </a>
                                 </li>
                             </ul>
@@ -439,6 +580,15 @@
             const seguridadSubmenu = document.getElementById('seguridadSubmenu');
             const accesosDirectosLink = document.getElementById('accesosDirectosLink');
             const accesosDirectosSubmenu = document.getElementById('accesosDirectosSubmenu');
+            // Nuevos menús
+            const agendaLink = document.getElementById('agendaLink');
+            const agendaSubmenu = document.getElementById('agendaSubmenu');
+            const prescripcionLink = document.getElementById('prescripcionLink');
+            const prescripcionSubmenu = document.getElementById('prescripcionSubmenu');
+            const comunicacionLink = document.getElementById('comunicacionLink');
+            const comunicacionSubmenu = document.getElementById('comunicacionSubmenu');
+            const hospitalizacionLink = document.getElementById('hospitalizacionLink');
+            const hospitalizacionSubmenu = document.getElementById('hospitalizacionSubmenu');
 
             if (registrosLink && registrosSubmenu) {
                 registrosLink.addEventListener('click', function(e) {
@@ -451,38 +601,50 @@
                         chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
                     }
                 });
-                    // Botón flotante y modal de chat
-                    var chatBtn = document.getElementById('chatFloatingBtn');
-                    var chatModal = new bootstrap.Modal(document.getElementById('chatModal'));
-                    if(chatBtn) {
-                        chatBtn.addEventListener('click', function() {
-                            chatModal.show();
-                        });
-                    }
-                    var socket = window.io ? io() : null;
-                    var chatForm = document.getElementById('chatForm');
-                    var chatInput = document.getElementById('chatMessage');
-                    var chatBox = document.getElementById('chatBox');
-                    var username = "{{ current_user.username if current_user.is_authenticated else '' }}";
-                    if(socket && chatForm && chatInput && chatBox) {
-                        socket.on('receive_message', function(data) {
-                            var msg = document.createElement('div');
-                            // Mostrar el remitente correctamente
-                            var emisor = data.remitente || data.username || 'Desconocido';
-                            msg.innerHTML = '<b>' + emisor + ':</b> ' + data.message;
-                            chatBox.appendChild(msg);
-                            chatBox.scrollTop = chatBox.scrollHeight;
-                        });
-                        chatForm.onsubmit = function(e) {
-                            e.preventDefault();
-                            var message = chatInput.value.trim();
-                            if(message) {
-                                // Enviar el remitente correctamente
-                                socket.emit('send_message', {remitente: username, message: message});
-                                chatInput.value = '';
-                            }
-                        };
-                    }
+            }
+
+            // Agenda y Citas
+            if (agendaLink && agendaSubmenu) {
+                agendaLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isVisible = agendaSubmenu.style.display !== 'none';
+                    agendaSubmenu.style.display = isVisible ? 'none' : 'block';
+                    const chevron = this.querySelector('.fa-chevron-down');
+                    if (chevron) chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            }
+
+            // Prescripción
+            if (prescripcionLink && prescripcionSubmenu) {
+                prescripcionLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isVisible = prescripcionSubmenu.style.display !== 'none';
+                    prescripcionSubmenu.style.display = isVisible ? 'none' : 'block';
+                    const chevron = this.querySelector('.fa-chevron-down');
+                    if (chevron) chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            }
+
+            // Comunicación
+            if (comunicacionLink && comunicacionSubmenu) {
+                comunicacionLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isVisible = comunicacionSubmenu.style.display !== 'none';
+                    comunicacionSubmenu.style.display = isVisible ? 'none' : 'block';
+                    const chevron = this.querySelector('.fa-chevron-down');
+                    if (chevron) chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
+            }
+
+            // Hospitalización
+            if (hospitalizacionLink && hospitalizacionSubmenu) {
+                hospitalizacionLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const isVisible = hospitalizacionSubmenu.style.display !== 'none';
+                    hospitalizacionSubmenu.style.display = isVisible ? 'none' : 'block';
+                    const chevron = this.querySelector('.fa-chevron-down');
+                    if (chevron) chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+                });
             }
 
             if (historiasLink && historiasSubmenu) {
@@ -574,6 +736,39 @@
                         chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
                     }
                 });
+            }
+
+            // Botón flotante y modal de chat
+            var chatBtn = document.getElementById('chatFloatingBtn');
+            var chatModal = new bootstrap.Modal(document.getElementById('chatModal'));
+            if(chatBtn) {
+                chatBtn.addEventListener('click', function() {
+                    chatModal.show();
+                });
+            }
+            var socket = window.io ? io() : null;
+            var chatForm = document.getElementById('chatForm');
+            var chatInput = document.getElementById('chatMessage');
+            var chatBox = document.getElementById('chatBox');
+            var username = "{{ current_user.username if current_user.is_authenticated else '' }}";
+            if(socket && chatForm && chatInput && chatBox) {
+                socket.on('receive_message', function(data) {
+                    var msg = document.createElement('div');
+                    // Mostrar el remitente correctamente
+                    var emisor = data.remitente || data.username || 'Desconocido';
+                    msg.innerHTML = '<b>' + emisor + ':</b> ' + data.message;
+                    chatBox.appendChild(msg);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                });
+                chatForm.onsubmit = function(e) {
+                    e.preventDefault();
+                    var message = chatInput.value.trim();
+                    if(message) {
+                        // Enviar el remitente correctamente
+                        socket.emit('send_message', {remitente: username, message: message});
+                        chatInput.value = '';
+                    }
+                };
             }
         });
     </script>

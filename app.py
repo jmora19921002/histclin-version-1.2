@@ -74,20 +74,44 @@ import os
 from config import config
 import os
 
-db = SQLAlchemy()
 app = Flask(__name__)
 app.config.from_object(config['development'])
 db = SQLAlchemy(app)
-socketio = SocketIO(app)
+
+# Configurar SocketIO con timeouts y parámetros seguros
+socketio = SocketIO(app, 
+                    cors_allowed_origins="*",
+                    async_mode='threading',
+                    ping_timeout=10,
+                    ping_interval=5,
+                    logger=False,
+                    engineio_logger=False)
 
 # Modelo para Bioanalista
 class Bioanalista(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    rif = db.Column(db.String(20), unique=True, nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
     apellido = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(50))  # Tipo de bioanalista
+    direccion = db.Column(db.Text)
     email = db.Column(db.String(120), unique=True, nullable=False)
     telefono = db.Column(db.String(20))
     fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relación con análisis realizados
+    analisis_realizados = db.relationship('AnalisisBioanalista', backref='bioanalista', lazy=True)
+
+# Modelo para Análisis realizados por Bioanalistas
+class AnalisisBioanalista(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    bioanalista_id = db.Column(db.Integer, db.ForeignKey('bioanalista.id'), nullable=False)
+    examen_id = db.Column(db.Integer, db.ForeignKey('examen.id'), nullable=False)
+    fecha_analisis = db.Column(db.DateTime, default=datetime.utcnow)
+    resultados = db.Column(db.Text)
+    observaciones = db.Column(db.Text)
+    # Relación con examen
+    examen = db.relationship('Examen', backref='analisis_bioanalista')
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -418,49 +442,6 @@ def generar_pdf_orden_examenes(nombre_paciente, detalles_html, instrucciones):
     with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp:
         pisa.CreatePDF(html, dest=temp)
         return temp.name
-    from flask import jsonify
-    nombre_paciente = request.form.get('nombre_paciente', 'Paciente')
-    instrucciones = request.form.get('instrucciones', 'Tomar cada 8 horas')
-    destinatario = request.form.get('email', 'destino@correo.com')
-    tratamientos_json = request.form.get('tratamientos_json', None)
-    medicamentos = ''
-    detalles_html = ''
-    if tratamientos_json:
-        import json
-        try:
-            tratamientos = json.loads(tratamientos_json)
-            detalles_html = ''
-            for t in tratamientos:
-                if t.get('motivo'):
-                    detalles_html += f"<div style='margin-bottom:6px;'><b>Motivo:</b> {t.get('motivo','')}</div>"
-                detalles_html += '<ul style="margin-left:20px;">'
-                for med in t.get('medicamentos', []):
-                    linea = f"{med.get('medicamento_id','')} {med.get('dosis','')}, {med.get('frecuencia','')} por {med.get('duracion','')}"
-                    detalles_html += f'<li>{linea.strip()}</li>'
-                detalles_html += '</ul>'
-            medicamentos = ', '.join(
-                med.get('medicamento_id', '')
-                for t in tratamientos for med in t.get('medicamentos', [])
-            )
-        except Exception:
-            detalles_html = '<i>Error al procesar tratamientos</i>'
-    else:
-        medicamentos = request.form.get('medicamentos', 'Paracetamol')
-    pdf_path = generar_pdf_receta_detallada(nombre_paciente, detalles_html, instrucciones)
-    try:
-        enviar_email_con_pdf(destinatario, 'Receta Médica', 'Adjunto su receta en PDF.', pdf_path)
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify(success=True)
-        else:
-            flash('Receta/orden enviada por correo electrónico.', 'success')
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify(success=False, error=str(e))
-        else:
-            flash(f'Error al enviar el correo: {str(e)}', 'danger')
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify(success=False, error='Error desconocido')
-    return redirect(url_for('nueva_consulta'))
 
 # Nueva función para PDF detallado
 def generar_pdf_receta_detallada(nombre_paciente, detalles_html, instrucciones):
@@ -905,6 +886,11 @@ class Emergencia(db.Model):
     tiempo_observacion = db.Column(db.String(50))
     tratamiento_aplicado = db.Column(db.Boolean, default=False)
     observaciones = db.Column(db.Text)
+    # Relaciones con tratamiento, cirugía y hospitalización
+    tratamiento_id = db.Column(db.Integer, db.ForeignKey('tratamiento.id'), nullable=True)
+    cirugia_id = db.Column(db.Integer, db.ForeignKey('cirugia.id'), nullable=True)
+    hospitalizacion_id = db.Column(db.Integer, db.ForeignKey('hospitalizacion.id'), nullable=True)
+    # Relaciones inversas
     paciente = db.relationship('Paciente', backref='emergencias')
     medico = db.relationship('Medico', backref='emergencias_atendidas')
 
@@ -925,12 +911,13 @@ class Tratamiento(db.Model):
 
 class Enfermera(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    dni = db.Column(db.String(20), unique=True, nullable=False)
+    rif = db.Column(db.String(20), unique=True, nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
     apellido = db.Column(db.String(100), nullable=False)
     especialidad = db.Column(db.String(100))
     telefono = db.Column(db.String(20))
     email = db.Column(db.String(120))
+    horario = db.Column(db.String(200))  # Horario de trabajo
     fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Examen(db.Model):
@@ -970,6 +957,216 @@ class TipoExamen(db.Model):
     tiempo_estimado = db.Column(db.String(50))
     preparacion_requerida = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
+
+# ==================== NUEVOS MODELOS ====================
+
+# Modelo para Proveedores
+class Proveedor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    rif = db.Column(db.String(20), unique=True, nullable=False)
+    razon_social = db.Column(db.String(200), nullable=False)
+    contacto = db.Column(db.String(100))
+    telefono = db.Column(db.String(20))
+    email = db.Column(db.String(120))
+    direccion = db.Column(db.Text)
+    tipo = db.Column(db.String(50))  # medicamentos, insumos, equipos, etc.
+    activo = db.Column(db.Boolean, default=True)
+    fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Modelo para Citas
+class Cita(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=False)
+    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'), nullable=False)
+    fecha_hora = db.Column(db.DateTime, nullable=False)
+    motivo = db.Column(db.Text)
+    estado = db.Column(db.String(20), default='programada')  # programada, confirmada, completada, cancelada
+    tipo = db.Column(db.String(50), default='consulta')  # consulta, control, emergencia
+    duracion_minutos = db.Column(db.Integer, default=30)
+    observaciones = db.Column(db.Text)
+    fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+    # Relaciones
+    paciente = db.relationship('Paciente', backref='citas')
+    medico = db.relationship('Medico', backref='citas_agendadas')
+
+# Modelo para Turnos Médicos
+class TurnoMedico(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'), nullable=False)
+    dia_semana = db.Column(db.Integer, nullable=False)  # 0=Lunes, 6=Domingo
+    hora_inicio = db.Column(db.Time, nullable=False)
+    hora_fin = db.Column(db.Time, nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    medico = db.relationship('Medico', backref='turnos')
+
+# Modelo para Recordatorios
+class Recordatorio(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cita_id = db.Column(db.Integer, db.ForeignKey('cita.id'), nullable=False)
+    fecha_envio = db.Column(db.DateTime, nullable=False)
+    tipo = db.Column(db.String(20), default='email')  # email, sms, whatsapp
+    enviado = db.Column(db.Boolean, default=False)
+    fecha_envio_real = db.Column(db.DateTime)
+    cita = db.relationship('Cita', backref='recordatorios')
+
+# Modelo para Prescripciones
+class Prescripcion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'), nullable=False)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    diagnostico = db.Column(db.Text)
+    medicamentos_json = db.Column(db.Text)  # JSON con lista de medicamentos
+    vigencia_dias = db.Column(db.Integer, default=30)
+    observaciones = db.Column(db.Text)
+    # Relaciones
+    medico = db.relationship('Medico', backref='prescripciones')
+    paciente = db.relationship('Paciente', backref='prescripciones')
+
+# Modelo para Plantillas de Prescripción
+class PlantillaPrescripcion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'), nullable=False)
+    nombre = db.Column(db.String(100), nullable=False)
+    descripcion = db.Column(db.Text)
+    medicamentos_json = db.Column(db.Text)  # JSON con lista de medicamentos predefinidos
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    medico = db.relationship('Medico', backref='plantillas_prescripcion')
+
+# Modelo para Camas
+class Cama(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    numero = db.Column(db.String(20), unique=True, nullable=False)
+    piso = db.Column(db.String(20))
+    tipo = db.Column(db.String(50))  # UCI, general, pediatría, etc.
+    ocupada = db.Column(db.Boolean, default=False)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=True)
+    fecha_ocupacion = db.Column(db.DateTime)
+    observaciones = db.Column(db.Text)
+    paciente = db.relationship('Paciente', backref='cama_actual')
+
+# Modelo para Rondas Médicas
+class RondaMedica(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    hospitalizacion_id = db.Column(db.Integer, db.ForeignKey('hospitalizacion.id'), nullable=False)
+    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'), nullable=False)
+    fecha_hora = db.Column(db.DateTime, default=datetime.utcnow)
+    observaciones = db.Column(db.Text)
+    evolucion = db.Column(db.Text)
+    ordenes_medicas = db.Column(db.Text)
+    hospitalizacion = db.relationship('Hospitalizacion', backref='rondas')
+    medico = db.relationship('Medico', backref='rondas_realizadas')
+
+# Modelo para Signos Vitales
+class SignosVitales(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=False)
+    hospitalizacion_id = db.Column(db.Integer, db.ForeignKey('hospitalizacion.id'), nullable=True)
+    fecha_hora = db.Column(db.DateTime, default=datetime.utcnow)
+    temperatura = db.Column(db.Float)
+    presion_arterial = db.Column(db.String(20))
+    frecuencia_cardiaca = db.Column(db.Integer)
+    frecuencia_respiratoria = db.Column(db.Integer)
+    saturacion_oxigeno = db.Column(db.Float)
+    peso = db.Column(db.Float)
+    talla = db.Column(db.Float)
+    observaciones = db.Column(db.Text)
+    registrado_por = db.Column(db.String(100))
+    paciente = db.relationship('Paciente', backref='signos_vitales')
+    hospitalizacion = db.relationship('Hospitalizacion', backref='signos_vitales')
+
+# Modelo para Pre-Altas
+class PreAlta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    hospitalizacion_id = db.Column(db.Integer, db.ForeignKey('hospitalizacion.id'), nullable=False)
+    fecha_probable = db.Column(db.Date, nullable=False)
+    condiciones_medicas = db.Column(db.Text)
+    indicaciones_alta = db.Column(db.Text)
+    medicamentos_alta = db.Column(db.Text)
+    controles_posteriores = db.Column(db.Text)
+    estado = db.Column(db.String(20), default='pendiente')  # pendiente, aprobada, cancelada
+    hospitalizacion = db.relationship('Hospitalizacion', backref='prealtas')
+
+# Modelo para Mensajes
+class Mensaje(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    remitente_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    destinatario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    asunto = db.Column(db.String(200))
+    contenido = db.Column(db.Text, nullable=False)
+    leido = db.Column(db.Boolean, default=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    remitente = db.relationship('Usuario', foreign_keys=[remitente_id], backref='mensajes_enviados')
+    destinatario = db.relationship('Usuario', foreign_keys=[destinatario_id], backref='mensajes_recibidos')
+
+# Modelo para Notas Compartidas
+class NotaCompartida(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    autor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    contenido = db.Column(db.Text, nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    tipo = db.Column(db.String(50))  # clinica, administrativa, alerta
+    autor = db.relationship('Usuario', backref='notas_creadas')
+    paciente = db.relationship('Paciente', backref='notas')
+
+# Modelo para Alertas del Personal
+class Alerta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(50), nullable=False)  # urgente, importante, info
+    titulo = db.Column(db.String(200), nullable=False)
+    contenido = db.Column(db.Text, nullable=False)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    usuario_creador_id = db.Column(db.Integer, db.ForeignKey('usuario.id'))
+    activa = db.Column(db.Boolean, default=True)
+    usuario_creador = db.relationship('Usuario', backref='alertas_creadas')
+
+# Modelo para Comunicados
+class Comunicado(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(200), nullable=False)
+    contenido = db.Column(db.Text, nullable=False)
+    fecha_publicacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_expiracion = db.Column(db.DateTime)
+    autor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+    autor = db.relationship('Usuario', backref='comunicados')
+
+# Modelo para Recepción de Pacientes
+class RecepcionPaciente(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'), nullable=False)
+    fecha_llegada = db.Column(db.DateTime, default=datetime.utcnow)
+    motivo = db.Column(db.Text, nullable=False)
+    prioridad = db.Column(db.String(20), default='normal')  # urgente, alta, normal, baja
+    estado = db.Column(db.String(20), default='esperando')  # esperando, en_atencion, atendido, cancelado
+    medico_asignado_id = db.Column(db.Integer, db.ForeignKey('medico.id'))
+    fecha_atencion = db.Column(db.DateTime)
+    observaciones = db.Column(db.Text)
+    paciente = db.relationship('Paciente', backref='recepciones')
+    medico_asignado = db.relationship('Medico', backref='recepciones_asignadas')
+
+# Modelo para Plantillas de Documentos
+class PlantillaDocumento(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)  # receta, orden_examen, informe, certificado
+    contenido_html = db.Column(db.Text, nullable=False)
+    variables = db.Column(db.Text)  # JSON con variables disponibles
+    activa = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Modelo para Configuración de Alertas
+class ConfiguracionAlerta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tipo_alerta = db.Column(db.String(50), nullable=False)  # stock_bajo, vencimiento, cita_proxima
+    parametros_json = db.Column(db.Text)  # JSON con configuración
+    activa = db.Column(db.Boolean, default=True)
+    fecha_modificacion = db.Column(db.DateTime, default=datetime.utcnow)
+
+# ==================== FIN NUEVOS MODELOS ====================
+
 # Rutas para Configuración y Usuarios (pie de página)
 
 import werkzeug
@@ -1058,9 +1255,6 @@ def nuevo_usuario():
  
 
 # (Las rutas de editar/eliminar usuario se moverán después de la inicialización de Flask y los decoradores)
- 
-
-    return Usuario.query.get(int(user_id))
 
 # Filtros personalizados de Jinja2
 @app.template_filter('from_json')
@@ -1324,30 +1518,30 @@ def eliminar_medicamento(id):
     
     return redirect(url_for('medicamentos'))
 
-# Rutas para Honorarios Médicos
-@app.route('/honorarios')
-@login_required
-def honorarios():
-    honorarios_list = HonorarioMedico.query.all()
-    return render_template('honorarios/index.html', honorarios=honorarios_list)
+# Rutas para Honorarios Médicos (DESHABILITADAS)
+# @app.route('/honorarios')
+# @login_required
+# def honorarios():
+#     honorarios_list = HonorarioMedico.query.all()
+#     return render_template('honorarios/index.html', honorarios=honorarios_list)
 
-@app.route('/honorarios/nuevo', methods=['GET', 'POST'])
-@login_required
-def nuevo_honorario():
-    if request.method == 'POST':
-        honorario = HonorarioMedico(
-            medico_id=int(request.form['medico_id']),
-            servicio=request.form['servicio'],
-            precio=float(request.form['precio']),
-            descripcion=request.form['descripcion']
-        )
-        db.session.add(honorario)
-        db.session.commit()
-        flash('Honorario registrado exitosamente')
-        return redirect(url_for('honorarios'))
-    
-    medicos_list = Medico.query.all()
-    return render_template('honorarios/nuevo.html', medicos=medicos_list)
+# @app.route('/honorarios/nuevo', methods=['GET', 'POST'])
+# @login_required
+# def nuevo_honorario():
+#     if request.method == 'POST':
+#         honorario = HonorarioMedico(
+#             medico_id=int(request.form['medico_id']),
+#             servicio=request.form['servicio'],
+#             precio=float(request.form['precio']),
+#             descripcion=request.form['descripcion']
+#         )
+#         db.session.add(honorario)
+#         db.session.commit()
+#         flash('Honorario registrado exitosamente')
+#         return redirect(url_for('honorarios'))
+#     
+#     medicos_list = Medico.query.all()
+#     return render_template('honorarios/nuevo.html', medicos=medicos_list)
 
 # Rutas para Servicios Clínicos
 @app.route('/servicios')
@@ -1374,6 +1568,30 @@ def nuevo_servicio():
     
     return render_template('servicios/nuevo.html')
 
+@app.route('/servicios/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_servicio(id):
+    servicio = ServicioClinico.query.get_or_404(id)
+    if request.method == 'POST':
+        servicio.codigo = request.form['codigo']
+        servicio.nombre = request.form['nombre']
+        servicio.descripcion = request.form['descripcion']
+        servicio.precio = float(request.form['precio'])
+        servicio.categoria = request.form['categoria']
+        db.session.commit()
+        flash('Servicio actualizado exitosamente')
+        return redirect(url_for('servicios'))
+    return render_template('servicios/editar.html', servicio=servicio)
+
+@app.route('/servicios/<int:id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_servicio(id):
+    servicio = ServicioClinico.query.get_or_404(id)
+    db.session.delete(servicio)
+    db.session.commit()
+    flash('Servicio eliminado exitosamente')
+    return redirect(url_for('servicios'))
+
 # Rutas para Enfermeras
 @app.route('/enfermeras')
 @login_required
@@ -1386,12 +1604,13 @@ def enfermeras():
 def nueva_enfermera():
     if request.method == 'POST':
         enfermera = Enfermera(
-            dni=request.form['dni'],
+            rif=request.form['rif'],
             nombre=request.form['nombre'],
             apellido=request.form['apellido'],
-            especialidad=request.form['especialidad'],
+            especialidad=request.form.get('especialidad', ''),
             telefono=request.form['telefono'],
-            email=request.form['email']
+            email=request.form['email'],
+            horario=request.form.get('horario', '')
         )
         db.session.add(enfermera)
         db.session.commit()
@@ -1399,6 +1618,55 @@ def nueva_enfermera():
         return redirect(url_for('enfermeras'))
     
     return render_template('enfermeras/nuevo.html')
+
+@app.route('/enfermeras/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_enfermera(id):
+    enfermera = Enfermera.query.get_or_404(id)
+    if request.method == 'POST':
+        enfermera.rif = request.form['rif']
+        enfermera.nombre = request.form['nombre']
+        enfermera.apellido = request.form['apellido']
+        enfermera.especialidad = request.form.get('especialidad', '')
+        enfermera.telefono = request.form['telefono']
+        enfermera.email = request.form['email']
+        enfermera.horario = request.form.get('horario', '')
+        db.session.commit()
+        flash('Enfermera actualizada exitosamente')
+        return redirect(url_for('enfermeras'))
+    return render_template('enfermeras/editar.html', enfermera=enfermera)
+
+@app.route('/enfermeras/<int:id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_enfermera(id):
+    enfermera = Enfermera.query.get_or_404(id)
+    db.session.delete(enfermera)
+    db.session.commit()
+    flash('Enfermera eliminada exitosamente')
+    return redirect(url_for('enfermeras'))
+
+@app.route('/enfermeras/<int:id>')
+@login_required
+def ver_enfermera(id):
+    enfermera = Enfermera.query.get_or_404(id)
+    # Obtener tratamientos asignados a esta enfermera
+    tratamientos = Tratamiento.query.filter_by(enfermera_id=id).all()
+    return jsonify({
+        'id': enfermera.id,
+        'rif': enfermera.rif,
+        'nombre': enfermera.nombre,
+        'apellido': enfermera.apellido,
+        'especialidad': enfermera.especialidad,
+        'telefono': enfermera.telefono,
+        'email': enfermera.email,
+        'horario': enfermera.horario,
+        'tratamientos_asignados': [{
+            'id': t.id,
+            'paciente': f"{t.paciente.nombre} {t.paciente.apellido}",
+            'fecha_inicio': t.fecha_inicio.strftime('%d/%m/%Y') if t.fecha_inicio else None,
+            'estado': t.estado
+        } for t in tratamientos]
+    })
 
 # Rutas para Historias Médicas
 @app.route('/historias')
@@ -1468,6 +1736,25 @@ def nueva_consulta():
                          medicos=medicos_list,
                          medicamentos=medicamentos_list,
                          pacientes_dict=pacientes_dict)
+
+@app.route('/consultas/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_consulta(id):
+    consulta = Consulta.query.get_or_404(id)
+    if request.method == 'POST':
+        consulta.paciente_id = int(request.form['paciente_id'])
+        consulta.medico_id = int(request.form['medico_id'])
+        consulta.motivo = request.form['motivo']
+        consulta.examenes_realizados = request.form.get('examenes_realizados', '')
+        consulta.tratamiento_aplicado = request.form.get('tratamiento_aplicado', '')
+        consulta.observaciones = request.form['observaciones']
+        consulta.ordenes_medicas = request.form.get('ordenes_medicas', '')
+        db.session.commit()
+        flash('Consulta actualizada exitosamente')
+        return redirect(url_for('consultas'))
+    pacientes_list = Paciente.query.all()
+    medicos_list = Medico.query.all()
+    return render_template('consultas/editar.html', consulta=consulta, pacientes=pacientes_list, medicos=medicos_list)
 
 @app.route('/consultas/<int:id>')
 @login_required
@@ -1582,7 +1869,50 @@ def nueva_emergencia():
 @login_required
 def ver_emergencia(id):
     emergencia = Emergencia.query.get_or_404(id)
-    return render_template('emergencias/ver.html', emergencia=emergencia)
+    # Obtener datos relacionados
+    tratamiento = None
+    cirugia = None
+    hospitalizacion = None
+    
+    if emergencia.tratamiento_id:
+        tratamiento = Tratamiento.query.get(emergencia.tratamiento_id)
+    if emergencia.cirugia_id:
+        cirugia = Cirugia.query.get(emergencia.cirugia_id)
+    if emergencia.hospitalizacion_id:
+        hospitalizacion = Hospitalizacion.query.get(emergencia.hospitalizacion_id)
+    
+    return jsonify({
+        'id': emergencia.id,
+        'paciente': {
+            'id': emergencia.paciente.id,
+            'nombre': f"{emergencia.paciente.nombre} {emergencia.paciente.apellido}",
+            'dni': emergencia.paciente.dni
+        },
+        'medico': {
+            'id': emergencia.medico.id,
+            'nombre': f"{emergencia.medico.nombre} {emergencia.medico.apellido}",
+            'especialidad': emergencia.medico.especialidad
+        },
+        'fecha_emergencia': emergencia.fecha_emergencia.strftime('%d/%m/%Y %H:%M'),
+        'motivo': emergencia.motivo,
+        'medicamentos_aplicados': emergencia.medicamentos_aplicados,
+        'instrumentos_aplicados': emergencia.instrumentos_aplicados,
+        'tiempo_observacion': emergencia.tiempo_observacion,
+        'tratamiento_aplicado': emergencia.tratamiento_aplicado,
+        'observaciones': emergencia.observaciones,
+        'tratamiento': {
+            'id': tratamiento.id if tratamiento else None,
+            'estado': tratamiento.estado if tratamiento else None
+        } if tratamiento else None,
+        'cirugia': {
+            'id': cirugia.id if cirugia else None,
+            'tipo': cirugia.tipo_cirugia if cirugia else None
+        } if cirugia else None,
+        'hospitalizacion': {
+            'id': hospitalizacion.id if hospitalizacion else None,
+            'dias': hospitalizacion.dias_hospitalizado if hospitalizacion else None
+        } if hospitalizacion else None
+    })
 
 @app.route('/emergencias/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
@@ -1615,6 +1945,67 @@ def eliminar_emergencia(id):
     db.session.commit()
     flash('Emergencia eliminada exitosamente')
     return redirect(url_for('emergencias'))
+
+@app.route('/emergencias/<int:id>/vincular', methods=['POST'])
+@login_required
+def vincular_emergencia(id):
+    """Vincular emergencia con tratamiento, cirugía u hospitalización"""
+    emergencia = Emergencia.query.get_or_404(id)
+    data = request.get_json()
+    
+    try:
+        if data.get('tipo') == 'tratamiento':
+            # Crear nuevo tratamiento
+            tratamiento = Tratamiento(
+                paciente_id=emergencia.paciente_id,
+                medico_id=emergencia.medico_id,
+                enfermera_id=int(data.get('enfermera_id', 1)),
+                fecha_inicio=datetime.utcnow(),
+                medicamentos_suministrados=emergencia.medicamentos_aplicados or '',
+                instrumentos_utilizados=emergencia.instrumentos_aplicados or '',
+                estado='activo',
+                observaciones=f'Tratamiento derivado de emergencia #{emergencia.id}'
+            )
+            db.session.add(tratamiento)
+            db.session.flush()
+            emergencia.tratamiento_id = tratamiento.id
+            
+        elif data.get('tipo') == 'cirugia':
+            # Crear nueva cirugía
+            cirugia = Cirugia(
+                paciente_id=emergencia.paciente_id,
+                medico_id=emergencia.medico_id,
+                enfermera_id=int(data.get('enfermera_id', 1)),
+                fecha_cirugia=datetime.utcnow(),
+                tipo_cirugia=data.get('tipo_cirugia', 'Emergencia'),
+                duracion_horas=float(data.get('duracion_horas', 1)),
+                cantidad_medicos=1,
+                observaciones=f'Cirugía derivada de emergencia #{emergencia.id}'
+            )
+            db.session.add(cirugia)
+            db.session.flush()
+            emergencia.cirugia_id = cirugia.id
+            
+        elif data.get('tipo') == 'hospitalizacion':
+            # Crear nueva hospitalización
+            hospitalizacion = Hospitalizacion(
+                paciente_id=emergencia.paciente_id,
+                medico_id=emergencia.medico_id,
+                enfermera_id=int(data.get('enfermera_id', 1)),
+                fecha_ingreso=datetime.utcnow(),
+                dias_hospitalizado=int(data.get('dias_hospitalizado', 1)),
+                observaciones=f'Hospitalización derivada de emergencia #{emergencia.id}'
+            )
+            db.session.add(hospitalizacion)
+            db.session.flush()
+            emergencia.hospitalizacion_id = hospitalizacion.id
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Vinculación exitosa'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/emergencias/buscar')
 @login_required
@@ -2009,8 +2400,11 @@ def bioanalistas():
 def nuevo_bioanalista():
     if request.method == 'POST':
         bioanalista = Bioanalista(
+            rif=request.form['rif'],
             nombre=request.form['nombre'],
             apellido=request.form['apellido'],
+            tipo=request.form.get('tipo', ''),
+            direccion=request.form.get('direccion', ''),
             email=request.form['email'],
             telefono=request.form['telefono']
         )
@@ -2025,8 +2419,11 @@ def nuevo_bioanalista():
 def editar_bioanalista(id):
     bioanalista = Bioanalista.query.get_or_404(id)
     if request.method == 'POST':
+        bioanalista.rif = request.form['rif']
         bioanalista.nombre = request.form['nombre']
         bioanalista.apellido = request.form['apellido']
+        bioanalista.tipo = request.form.get('tipo', '')
+        bioanalista.direccion = request.form.get('direccion', '')
         bioanalista.email = request.form['email']
         bioanalista.telefono = request.form['telefono']
         db.session.commit()
@@ -2051,6 +2448,390 @@ def obtener_accesos_directos_usuario(usuario_id):
 
 # Registrar la función como filtro de Jinja2 para usar en plantillas
 app.jinja_env.globals['obtener_accesos_directos_usuario'] = obtener_accesos_directos_usuario
+
+# ==================== RUTAS NUEVOS MÓDULOS ====================
+
+# === PROVEEDORES ===
+@app.route('/proveedores')
+@login_required
+@role_required('administrador', 'enfermera')
+def proveedores():
+    proveedores_list = Proveedor.query.filter_by(activo=True).all()
+    return render_template('proveedores/index.html', proveedores=proveedores_list)
+
+@app.route('/proveedores/nuevo', methods=['GET', 'POST'])
+@login_required
+def nuevo_proveedor():
+    if request.method == 'POST':
+        proveedor = Proveedor(
+            rif=request.form['rif'],
+            razon_social=request.form['razon_social'],
+            contacto=request.form.get('contacto', ''),
+            telefono=request.form['telefono'],
+            email=request.form['email'],
+            direccion=request.form.get('direccion', ''),
+            tipo=request.form['tipo']
+        )
+        db.session.add(proveedor)
+        db.session.commit()
+        flash('Proveedor registrado exitosamente')
+        return redirect(url_for('proveedores'))
+    return render_template('proveedores/nuevo.html')
+
+@app.route('/proveedores/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_proveedor(id):
+    proveedor = Proveedor.query.get_or_404(id)
+    if request.method == 'POST':
+        proveedor.rif = request.form['rif']
+        proveedor.razon_social = request.form['razon_social']
+        proveedor.contacto = request.form.get('contacto', '')
+        proveedor.telefono = request.form['telefono']
+        proveedor.email = request.form['email']
+        proveedor.direccion = request.form.get('direccion', '')
+        proveedor.tipo = request.form['tipo']
+        db.session.commit()
+        flash('Proveedor actualizado exitosamente')
+        return redirect(url_for('proveedores'))
+    return render_template('proveedores/editar.html', proveedor=proveedor)
+
+@app.route('/proveedores/<int:id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_proveedor(id):
+    proveedor = Proveedor.query.get_or_404(id)
+    proveedor.activo = False
+    db.session.commit()
+    flash('Proveedor desactivado exitosamente')
+    return redirect(url_for('proveedores'))
+
+# === AGENDA Y CITAS ===
+@app.route('/agenda')
+@login_required
+def agenda():
+    return render_template('agenda/index.html')
+
+@app.route('/agenda/calendario')
+@login_required
+def agenda_calendario():
+    # Obtener citas del mes actual
+    hoy = datetime.now()
+    inicio_mes = hoy.replace(day=1)
+    fin_mes = (inicio_mes + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    citas = Cita.query.filter(Cita.fecha_hora.between(inicio_mes, fin_mes)).all()
+    return render_template('agenda/calendario.html', citas=citas)
+
+@app.route('/agenda/citas')
+@login_required
+def agenda_citas():
+    citas_list = Cita.query.filter(Cita.estado != 'cancelada').order_by(Cita.fecha_hora.desc()).all()
+    pacientes_list = Paciente.query.all()
+    medicos_list = Medico.query.all()
+    return render_template('agenda/citas.html', citas=citas_list, pacientes=pacientes_list, medicos=medicos_list)
+
+@app.route('/agenda/citas/nuevo', methods=['GET', 'POST'])
+@login_required
+def nueva_cita():
+    if request.method == 'POST':
+        cita = Cita(
+            paciente_id=int(request.form['paciente_id']),
+            medico_id=int(request.form['medico_id']),
+            fecha_hora=datetime.strptime(request.form['fecha_hora'], '%Y-%m-%dT%H:%M'),
+            motivo=request.form['motivo'],
+            tipo=request.form.get('tipo', 'consulta'),
+            duracion_minutos=int(request.form.get('duracion_minutos', 30)),
+            observaciones=request.form.get('observaciones', '')
+        )
+        db.session.add(cita)
+        db.session.commit()
+        flash('Cita agendada exitosamente')
+        return redirect(url_for('agenda_citas'))
+    pacientes_list = Paciente.query.all()
+    medicos_list = Medico.query.all()
+    return render_template('agenda/nueva_cita.html', pacientes=pacientes_list, medicos=medicos_list)
+
+@app.route('/agenda/citas/<int:id>/reagendar', methods=['POST'])
+@login_required
+def reagendar_cita(id):
+    cita = Cita.query.get_or_404(id)
+    nueva_fecha = request.form.get('nueva_fecha_hora')
+    if nueva_fecha:
+        cita.fecha_hora = datetime.strptime(nueva_fecha, '%Y-%m-%dT%H:%M')
+        cita.estado = 'programada'
+        db.session.commit()
+        flash('Cita reagendada exitosamente')
+    return redirect(url_for('agenda_citas'))
+
+@app.route('/agenda/citas/<int:id>/cancelar', methods=['POST'])
+@login_required
+def cancelar_cita(id):
+    cita = Cita.query.get_or_404(id)
+    cita.estado = 'cancelada'
+    db.session.commit()
+    flash('Cita cancelada exitosamente')
+    return redirect(url_for('agenda_citas'))
+
+# === PRESCRIPCIÓN ===
+@app.route('/prescripciones')
+@login_required
+def prescripciones():
+    prescripciones_list = Prescripcion.query.order_by(Prescripcion.fecha.desc()).all()
+    return render_template('prescripciones/index.html', prescripciones=prescripciones_list)
+
+@app.route('/prescripciones/nuevo', methods=['GET', 'POST'])
+@login_required
+def nueva_prescripcion():
+    if request.method == 'POST':
+        import json
+        # Procesar medicamentos
+        medicamentos_ids = request.form.getlist('medicamento_id[]')
+        dosis = request.form.getlist('dosis[]')
+        frecuencia = request.form.getlist('frecuencia[]')
+        duracion = request.form.getlist('duracion[]')
+        
+        medicamentos_data = []
+        for i in range(len(medicamentos_ids)):
+            if medicamentos_ids[i]:
+                med = Medicamento.query.get(int(medicamentos_ids[i]))
+                if med:
+                    medicamentos_data.append({
+                        'id': med.id,
+                        'nombre': med.nombre,
+                        'dosis': dosis[i],
+                        'frecuencia': frecuencia[i],
+                        'duracion': duracion[i]
+                    })
+        
+        prescripcion = Prescripcion(
+            medico_id=int(request.form['medico_id']),
+            paciente_id=int(request.form['paciente_id']),
+            diagnostico=request.form['diagnostico'],
+            medicamentos_json=json.dumps(medicamentos_data, ensure_ascii=False),
+            vigencia_dias=int(request.form.get('vigencia_dias', 30)),
+            observaciones=request.form.get('observaciones', '')
+        )
+        db.session.add(prescripcion)
+        db.session.commit()
+        flash('Prescripción registrada exitosamente')
+        return redirect(url_for('prescripciones'))
+    
+    pacientes_list = Paciente.query.all()
+    medicos_list = Medico.query.all()
+    medicamentos_list = Medicamento.query.all()
+    plantillas = PlantillaPrescripcion.query.all()
+    return render_template('prescripciones/nuevo.html', 
+                         pacientes=pacientes_list, 
+                         medicos=medicos_list, 
+                         medicamentos=medicamentos_list,
+                         plantillas=plantillas)
+
+@app.route('/prescripciones/plantillas')
+@login_required
+def plantillas_prescripcion():
+    plantillas = PlantillaPrescripcion.query.all()
+    return render_template('prescripciones/plantillas.html', plantillas=plantillas)
+
+# === RECEPCIÓN ===
+@app.route('/recepcion')
+@login_required
+@role_required('administrador', 'recepcion')
+def recepcion():
+    # Cola de espera: pacientes en estado 'esperando'
+    cola = RecepcionPaciente.query.filter_by(estado='esperando').order_by(RecepcionPaciente.prioridad.desc(), RecepcionPaciente.fecha_llegada.asc()).all()
+    # Pacientes en atención
+    en_atencion = RecepcionPaciente.query.filter_by(estado='en_atencion').all()
+    return render_template('recepcion/index.html', cola=cola, en_atencion=en_atencion)
+
+@app.route('/recepcion/registrar', methods=['GET', 'POST'])
+@login_required
+def registrar_recepcion():
+    if request.method == 'POST':
+        recepcion = RecepcionPaciente(
+            paciente_id=int(request.form['paciente_id']),
+            motivo=request.form['motivo'],
+            prioridad=request.form.get('prioridad', 'normal'),
+            medico_asignado_id=int(request.form['medico_id']) if request.form.get('medico_id') else None,
+            observaciones=request.form.get('observaciones', '')
+        )
+        db.session.add(recepcion)
+        db.session.commit()
+        flash('Paciente registrado en recepción')
+        return redirect(url_for('recepcion'))
+    
+    pacientes_list = Paciente.query.all()
+    medicos_list = Medico.query.all()
+    return render_template('recepcion/registrar.html', pacientes=pacientes_list, medicos=medicos_list)
+
+@app.route('/recepcion/<int:id>/atender', methods=['POST'])
+@login_required
+def atender_recepcion(id):
+    recepcion = RecepcionPaciente.query.get_or_404(id)
+    recepcion.estado = 'en_atencion'
+    recepcion.fecha_atencion = datetime.utcnow()
+    db.session.commit()
+    flash('Paciente en atención')
+    return redirect(url_for('recepcion'))
+
+@app.route('/recepcion/<int:id>/completar', methods=['POST'])
+@login_required
+def completar_recepcion(id):
+    recepcion = RecepcionPaciente.query.get_or_404(id)
+    recepcion.estado = 'atendido'
+    db.session.commit()
+    flash('Atención completada')
+    return redirect(url_for('recepcion'))
+
+# === COMUNICACIÓN ===
+@app.route('/comunicacion')
+@login_required
+def comunicacion():
+    return render_template('comunicacion/index.html')
+
+@app.route('/comunicacion/mensajes')
+@login_required
+def comunicacion_mensajes():
+    mensajes_recibidos = Mensaje.query.filter_by(destinatario_id=current_user.id).order_by(Mensaje.fecha.desc()).all()
+    mensajes_enviados = Mensaje.query.filter_by(remitente_id=current_user.id).order_by(Mensaje.fecha.desc()).all()
+    usuarios = Usuario.query.filter(Usuario.id != current_user.id).all()
+    return render_template('comunicacion/mensajes.html', 
+                         mensajes_recibidos=mensajes_recibidos, 
+                         mensajes_enviados=mensajes_enviados,
+                         usuarios=usuarios)
+
+@app.route('/comunicacion/mensajes/nuevo', methods=['POST'])
+@login_required
+def nuevo_mensaje_comunicacion():
+    mensaje = Mensaje(
+        remitente_id=current_user.id,
+        destinatario_id=int(request.form['destinatario_id']),
+        asunto=request.form.get('asunto', ''),
+        contenido=request.form['contenido']
+    )
+    db.session.add(mensaje)
+    db.session.commit()
+    flash('Mensaje enviado exitosamente')
+    return redirect(url_for('comunicacion_mensajes'))
+
+@app.route('/comunicacion/alertas')
+@login_required
+def comunicacion_alertas():
+    alertas = Alerta.query.filter_by(activa=True).order_by(Alerta.fecha_creacion.desc()).all()
+    return render_template('comunicacion/alertas.html', alertas=alertas)
+
+@app.route('/comunicacion/comunicados')
+@login_required
+def comunicacion_comunicados():
+    comunicados = Comunicado.query.filter_by(activo=True).order_by(Comunicado.fecha_publicacion.desc()).all()
+    return render_template('comunicacion/comunicados.html', comunicados=comunicados)
+
+# === HOSPITALIZACIÓN AMPLIADA ===
+@app.route('/hospitalizaciones/camas')
+@login_required
+def hospitalizaciones_camas():
+    camas = Cama.query.all()
+    return render_template('hospitalizaciones/camas.html', camas=camas)
+
+@app.route('/hospitalizaciones/rondas')
+@login_required
+def hospitalizaciones_rondas():
+    rondas = RondaMedica.query.order_by(RondaMedica.fecha_hora.desc()).all()
+    hospitalizaciones = Hospitalizacion.query.all()
+    medicos = Medico.query.all()
+    return render_template('hospitalizaciones/rondas.html', rondas=rondas, hospitalizaciones=hospitalizaciones, medicos=medicos)
+
+@app.route('/hospitalizaciones/signos')
+@login_required
+def hospitalizaciones_signos():
+    signos = SignosVitales.query.order_by(SignosVitales.fecha_hora.desc()).limit(50).all()
+    return render_template('hospitalizaciones/signos.html', signos=signos)
+
+@app.route('/hospitalizaciones/prealtas')
+@login_required
+def hospitalizaciones_prealtas():
+    prealtas = PreAlta.query.order_by(PreAlta.fecha_probable.desc()).all()
+    return render_template('hospitalizaciones/prealtas.html', prealtas=prealtas)
+
+# === HISTORIAS MÉDICAS AMPLIADAS ===
+@app.route('/historias/unica/<int:paciente_id>')
+@login_required
+def historia_unica(paciente_id):
+    paciente = Paciente.query.get_or_404(paciente_id)
+    consultas = Consulta.query.filter_by(paciente_id=paciente_id).order_by(Consulta.fecha_consulta.desc()).all()
+    emergencias = Emergencia.query.filter_by(paciente_id=paciente_id).order_by(Emergencia.fecha_emergencia.desc()).all()
+    tratamientos = Tratamiento.query.filter_by(paciente_id=paciente_id).order_by(Tratamiento.fecha_inicio.desc()).all()
+    cirugias = Cirugia.query.filter_by(paciente_id=paciente_id).order_by(Cirugia.fecha_cirugia.desc()).all()
+    hospitalizaciones = Hospitalizacion.query.filter_by(paciente_id=paciente_id).order_by(Hospitalizacion.fecha_ingreso.desc()).all()
+    examenes = Examen.query.filter_by(paciente_id=paciente_id).order_by(Examen.fecha_solicitud.desc()).all()
+    
+    return render_template('historias/historia_unica.html', 
+                         paciente=paciente,
+                         consultas=consultas,
+                         emergencias=emergencias,
+                         tratamientos=tratamientos,
+                         cirugias=cirugias,
+                         hospitalizaciones=hospitalizaciones,
+                         examenes=examenes)
+
+@app.route('/historias/timeline/<int:paciente_id>')
+@login_required
+def historia_timeline(paciente_id):
+    paciente = Paciente.query.get_or_404(paciente_id)
+    
+    # Crear lista unificada de eventos
+    eventos = []
+    
+    for c in Consulta.query.filter_by(paciente_id=paciente_id).all():
+        eventos.append({'tipo': 'consulta', 'fecha': c.fecha_consulta, 'data': c})
+    
+    for e in Emergencia.query.filter_by(paciente_id=paciente_id).all():
+        eventos.append({'tipo': 'emergencia', 'fecha': e.fecha_emergencia, 'data': e})
+    
+    for t in Tratamiento.query.filter_by(paciente_id=paciente_id).all():
+        eventos.append({'tipo': 'tratamiento', 'fecha': t.fecha_inicio, 'data': t})
+    
+    for c in Cirugia.query.filter_by(paciente_id=paciente_id).all():
+        eventos.append({'tipo': 'cirugia', 'fecha': c.fecha_cirugia, 'data': c})
+    
+    for h in Hospitalizacion.query.filter_by(paciente_id=paciente_id).all():
+        eventos.append({'tipo': 'hospitalizacion', 'fecha': h.fecha_ingreso, 'data': h})
+    
+    # Ordenar por fecha descendente
+    eventos.sort(key=lambda x: x['fecha'], reverse=True)
+    
+    return render_template('historias/timeline.html', paciente=paciente, eventos=eventos)
+
+# === INFORMES AMPLIADOS ===
+@app.route('/informes/epidemiologia')
+@login_required
+def informes_epidemiologia():
+    # Estadísticas por diagnósticos más frecuentes
+    from sqlalchemy import func
+    diagnosticos = db.session.query(
+        Consulta.examenes_realizados,
+        func.count(Consulta.id).label('cantidad')
+    ).group_by(Consulta.examenes_realizados).order_by(func.count(Consulta.id).desc()).limit(10).all()
+    
+    return render_template('informes/epidemiologia.html', diagnosticos=diagnosticos)
+
+@app.route('/informes/calidad')
+@login_required
+def informes_calidad():
+    # Indicadores de calidad asistencial
+    total_consultas = Consulta.query.count()
+    total_emergencias = Emergencia.query.count()
+    total_cirugias = Cirugia.query.count()
+    
+    return render_template('informes/calidad.html', 
+                         total_consultas=total_consultas,
+                         total_emergencias=total_emergencias,
+                         total_cirugias=total_cirugias)
+
+@app.route('/informes/bi')
+@login_required
+def informes_bi():
+    # Business Intelligence Dashboard
+    return render_template('informes/bi.html')
+
+# ==================== FIN RUTAS NUEVOS MÓDULOS ====================
 
 # Ruta para chat general
 @app.route('/chat')
@@ -2078,4 +2859,19 @@ def handle_send_message(data):
     }, broadcast=True)
 
 if __name__ == '__main__':
-    socketio.run(app, host=app.config['HOST'], port=app.config['PORT'], debug=app.config['DEBUG'])
+    import sys
+    try:
+        print(f"Iniciando servidor en {app.config.get('HOST', '0.0.0.0')}:{app.config.get('PORT', 5000)}")
+        print("Presiona CTRL+C para detener el servidor")
+        socketio.run(app, 
+                    host=app.config.get('HOST', '0.0.0.0'), 
+                    port=app.config.get('PORT', 5000), 
+                    debug=app.config.get('DEBUG', False),
+                    use_reloader=False,
+                    allow_unsafe_werkzeug=True)
+    except KeyboardInterrupt:
+        print("\nServidor detenido por el usuario")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error al iniciar el servidor: {e}")
+        sys.exit(1)
