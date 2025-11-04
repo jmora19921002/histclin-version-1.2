@@ -91,6 +91,7 @@ socketio = SocketIO(app,
 class Bioanalista(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     rif = db.Column(db.String(20), unique=True, nullable=False)
+    cedula = db.Column(db.String(20))  # Cédula de identidad
     nombre = db.Column(db.String(100), nullable=False)
     apellido = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.String(50))  # Tipo de bioanalista
@@ -168,6 +169,7 @@ def generar_pdf_receta(nombre_paciente, medicamentos, instrucciones):
         meds_html = ''.join(f'<li>{m.strip()}</li>' for m in medicamentos.split(',') if m.strip())
     else:
         meds_html = '<li>No especificados</li>'
+    instrucciones_html = (instrucciones or '').replace('\n', '<br>')
     html = f'''
     <html>
     <head>
@@ -200,7 +202,7 @@ def generar_pdf_receta(nombre_paciente, medicamentos, instrucciones):
             </div>
             <div class="seccion">
                 <strong>Instrucciones:</strong><br>
-                {instrucciones.replace('\n', '<br>')}
+                {instrucciones_html}
             </div>
             <div class="firma">
                 <div class="firma-linea"></div>
@@ -399,6 +401,7 @@ def generar_pdf_orden_examenes(nombre_paciente, detalles_html, instrucciones):
         """
     else:
         empresa_html = "<div class='empresa'>ORDEN DE EXÁMENES</div>"
+    instrucciones_html = (instrucciones or '').replace('\n', '<br>')
     html = f'''
     <html>
     <head>
@@ -429,7 +432,7 @@ def generar_pdf_orden_examenes(nombre_paciente, detalles_html, instrucciones):
             </div>
             <div class="seccion">
                 <strong>Instrucciones:</strong><br>
-                {instrucciones.replace('\n', '<br>')}
+                {instrucciones_html}
             </div>
             <div class="firma">
                 <div class="firma-linea"></div>
@@ -464,6 +467,7 @@ def generar_pdf_receta_detallada(nombre_paciente, detalles_html, instrucciones):
         """
     else:
         empresa_html = "<div class='empresa'>RECETA MÉDICA</div>"
+    instrucciones_html = (instrucciones or '').replace('\n', '<br>')
     html = f'''
     <html>
     <head>
@@ -494,7 +498,7 @@ def generar_pdf_receta_detallada(nombre_paciente, detalles_html, instrucciones):
             </div>
             <div class="seccion">
                 <strong>Instrucciones:</strong><br>
-                {instrucciones.replace('\n', '<br>')}
+                {instrucciones_html}
             </div>
             <div class="firma">
                 <div class="firma-linea"></div>
@@ -2401,12 +2405,13 @@ def nuevo_bioanalista():
     if request.method == 'POST':
         bioanalista = Bioanalista(
             rif=request.form['rif'],
+            cedula=request.form.get('cedula', ''),
             nombre=request.form['nombre'],
             apellido=request.form['apellido'],
             tipo=request.form.get('tipo', ''),
             direccion=request.form.get('direccion', ''),
             email=request.form['email'],
-            telefono=request.form['telefono']
+            telefono=request.form.get('telefono', '')
         )
         db.session.add(bioanalista)
         db.session.commit()
@@ -2420,12 +2425,13 @@ def editar_bioanalista(id):
     bioanalista = Bioanalista.query.get_or_404(id)
     if request.method == 'POST':
         bioanalista.rif = request.form['rif']
+        bioanalista.cedula = request.form.get('cedula', '')
         bioanalista.nombre = request.form['nombre']
         bioanalista.apellido = request.form['apellido']
         bioanalista.tipo = request.form.get('tipo', '')
         bioanalista.direccion = request.form.get('direccion', '')
         bioanalista.email = request.form['email']
-        bioanalista.telefono = request.form['telefono']
+        bioanalista.telefono = request.form.get('telefono', '')
         db.session.commit()
         flash('Bioanalista actualizado exitosamente')
         return redirect(url_for('bioanalistas'))
@@ -2639,7 +2645,24 @@ def recepcion():
     cola = RecepcionPaciente.query.filter_by(estado='esperando').order_by(RecepcionPaciente.prioridad.desc(), RecepcionPaciente.fecha_llegada.asc()).all()
     # Pacientes en atención
     en_atencion = RecepcionPaciente.query.filter_by(estado='en_atencion').all()
-    return render_template('recepcion/index.html', cola=cola, en_atencion=en_atencion)
+    # Mapa de camas
+    camas = Cama.query.all()
+    # Médico de turno actual
+    hoy = datetime.now()
+    dia = hoy.weekday()
+    hora_actual = hoy.time()
+    medico_turno = None
+    try:
+        turnos = TurnoMedico.query.filter_by(dia_semana=dia, activo=True).all()
+        for t in turnos:
+            if t.hora_inicio <= hora_actual <= t.hora_fin:
+                medico_turno = t.medico
+                break
+    except Exception:
+        medico_turno = None
+    # Emergencias activas (hoy)
+    emergencias_hoy = Emergencia.query.filter(Emergencia.fecha_emergencia >= hoy.replace(hour=0, minute=0, second=0, microsecond=0)).all()
+    return render_template('recepcion/index.html', cola=cola, en_atencion=en_atencion, camas=camas, medico_turno=medico_turno, emergencias_hoy=emergencias_hoy)
 
 @app.route('/recepcion/registrar', methods=['GET', 'POST'])
 @login_required
